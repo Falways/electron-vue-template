@@ -2,7 +2,6 @@ import { BrowserWindow, Menu } from 'electron'
 import menuconfig from '../config/menu'
 import config from '@config'
 import setIpc from './ipcMain'
-import electronDevtoolsInstaller, { VUEJS_DEVTOOLS } from 'electron-devtools-installer'
 import upload from './checkupdate'
 import DownloadUpdate from './downloadFile'
 import { winURL, loadingURL } from '../config/StaticPath'
@@ -55,9 +54,6 @@ function createMainWindow () {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.once('dom-ready', () => {
       mainWindow.show()
-      electronDevtoolsInstaller(VUEJS_DEVTOOLS)
-        .then((name) => console.log(`installed: ${name}`))
-        .catch(err => console.log('Unable to install `vue-devtools`: \n', err))
     })
     if (config.UseStartupChart) loadWindow.destroy()
 
