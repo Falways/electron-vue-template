@@ -42,6 +42,7 @@ npm config edit
 这是花裤衩大大原本的[地址](https://github.com/PanJiaChen/electron-vue-admin)
 
 # 更新日志
+- 2020年09月12日：更新依赖，去除.electron-vue中的冗余代码，将已经转入维护模式happypack修改为thread-loader。
 - 2020年09月10日：例行更新依赖，感谢 @BelinChung 贡献代码，修正bug。
 - 2020年04月30日：添加内置服务端关闭方法，进一步简化登录流程；多窗口文档已就绪，服务端说明尚未补充。
 - 2020年04月29日：添加了路由多窗口示例，修复web打包，提升依赖；文档还未就绪
