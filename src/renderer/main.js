@@ -11,6 +11,8 @@ import './permission'
 import './error'
 import './icons'
 import '@/styles/index.scss'
+// 注册全局日志组件, 用于生成环境debug(TODO)
+const logger = {}
 
 if (!process.env.IS_WEB) {
   if (!require('../../config').IsUseSysTitle) {
