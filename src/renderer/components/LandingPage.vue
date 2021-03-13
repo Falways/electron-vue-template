@@ -6,28 +6,41 @@
         <span class="title">欢迎进入本框架</span>
         <system-information></system-information>
         <div v-if="textarray.length === 0">
-          <span>{{text}}</span>
+          <span>{{ text }}</span>
         </div>
-        <div v-for="(itme,index) in textarray" :key="index" v-else>
-          <span>{{itme._id}}</span>
-          <span>{{itme.name}}</span>
-          <span>{{itme.age}}</span>
+        <div v-for="(itme, index) in textarray" :key="index" v-else>
+          <span>{{ itme._id }}</span>
+          <span>{{ itme.name }}</span>
+          <span>{{ itme.age }}</span>
         </div>
       </div>
 
       <div class="right-side">
         <div class="doc">
-          <div class="title alt">您可以点击的按钮</div>
+          <div class="title alt">您可以点击的按钮测试功能</div>
           <el-button type="primary" round @click="open()">控制台打印</el-button>
-          <el-button type="primary" round @click="setdata">写入数据</el-button>
-          <el-button type="primary" round @click="getdata">读取数据</el-button>
-          <el-button type="primary" round @click="deledata">清除所有数据</el-button>
-          <el-button type="primary" round @click="CheckUpdate('one')">检查更新</el-button>
+          <el-button type="primary" round @click="CheckUpdate('one')"
+            >检查更新</el-button
+          >
         </div>
         <div class="doc">
-          <el-button type="primary" round @click="CheckUpdate('two')">检查更新（第二种方法）</el-button>
-          <el-button type="primary" round @click="StartServer">启动内置服务端</el-button>
-          <el-button type="primary" round @click="getMessage">查看消息</el-button>
+          <el-button type="primary" round @click="CheckUpdate('two')"
+            >检查更新（第二种方法）</el-button
+          >
+          <el-button type="primary" round @click="StartServer"
+            >启动内置服务端</el-button
+          >
+          <el-button type="primary" round @click="StopServer"
+            >关闭内置服务端</el-button
+          >
+          <el-button type="primary" round @click="getMessage"
+            >查看消息</el-button
+          >
+        </div>
+        <div class="doc">
+          <el-button type="primary" round @click="openNewWin"
+            >打开新窗口</el-button
+          >
         </div>
       </div>
     </main>
@@ -54,6 +67,7 @@
 <script>
 import SystemInformation from "./LandingPage/SystemInformation";
 import { message } from "@/api/login";
+import { ipcRenderer } from "electron";
 export default {
   name: "landing-page",
   components: { SystemInformation },
@@ -61,7 +75,7 @@ export default {
     text: "等待数据读取",
     newdata: {
       name: "yyy",
-      age: "12"
+      age: "12",
     },
     logo: require("@/assets/logo.png"),
     textarray: [],
@@ -71,172 +85,133 @@ export default {
       { color: "#e6a23c", percentage: 40 },
       { color: "#6f7ad3", percentage: 60 },
       { color: "#1989fa", percentage: 80 },
-      { color: "#5cb87a", percentage: 100 }
+      { color: "#5cb87a", percentage: 100 },
     ],
     dialogVisible: false,
     progressStaus: null,
-    filePath: ""
+    filePath: "",
   }),
   created() {
     console.log(__lib);
-    // 异步进程通信监听
-    this.$ipcApi.on("confirm-message", (event, arg) => {
-      console.log(arg);
-      if (arg.response === 0) {
-        this.$db.deleall({name: "yyy"}).then(res => {
-          console.log(res);
-          if (res !== 0) {
-            this.getdata();
-            this.$message({
-              message: "成功删除" + res + "条",
-              type: "success"
-            });
-          } else {
-            let errormsg = {
-              title: "错误",
-              message: "已经没有数据可以被删除！"
-            };
-            this.$ipcApi.send("open-errorbox", errormsg);
-          }
+    ipcRenderer.on("download-progress", (event, arg) => {
+      this.percentage = Number(arg);
+    });
+    ipcRenderer.on("download-error", (event, arg) => {
+      if (arg) {
+        this.progressStaus = "exception";
+        this.percentage = 40;
+        this.colors = "#d81e06";
+      }
+    });
+    ipcRenderer.on("download-paused", (event, arg) => {
+      if (arg) {
+        this.progressStaus = "warning";
+        this.$alert("下载由于未知原因被中断！", "提示", {
+          confirmButtonText: "重试",
+          callback: (action) => {
+            this.$ipcApi.send("satrt-download");
+          },
         });
+      }
+    });
+    ipcRenderer.on("download-done", (event, age) => {
+      this.filePath = age.filePath;
+      this.progressStaus = "success";
+      this.$alert("更新下载完成！", "提示", {
+        confirmButtonText: "确定",
+        callback: (action) => {
+          this.$electron.shell.openPath(this.filePath);
+        },
+      });
+    });
+    ipcRenderer.on("UpdateMsg", (event, age) => {
+      switch (age.state) {
+        case -1:
+          const msgdata = {
+            title: "发生错误",
+            message: age.msg,
+          };
+          this.dialogVisible = false;
+          this.$ipcApi.send("open-errorbox", msgdata);
+          break;
+        case 0:
+          this.$message("正在检查更新");
+          break;
+        case 1:
+          this.$message({
+            type: "success",
+            message: "已检查到新版本，开始下载",
+          });
+          this.dialogVisible = true;
+          break;
+        case 2:
+          this.$message({ type: "success", message: "无新版本" });
+          break;
+        case 3:
+          this.percentage = age.msg.percent.toFixed(1);
+          break;
+        case 4:
+          this.progressStaus = "success";
+          this.$alert("更新下载完成！", "提示", {
+            confirmButtonText: "确定",
+            callback: (action) => {
+              this.$ipcApi.send("confirm-update");
+            },
+          });
+          break;
+
+        default:
+          break;
       }
     });
   },
   methods: {
+    openNewWin() {
+      let data = {
+        url: "/form/index",
+      };
+      this.$ipcApi.send("open-win", data);
+    },
     getMessage() {
-      message().then(res => {
+      message().then((res) => {
         this.$alert(res.data, "提示", {
-          confirmButtonText: "确定"
+          confirmButtonText: "确定",
+        });
+      });
+    },
+    StopServer() {
+      this.$ipcApi.send("stop-server").then((res) => {
+        this.$message({
+          type: "success",
+          message: "已关闭",
         });
       });
     },
     StartServer() {
-      this.$ipcApi.send("statr-server");
-      this.$ipcApi.on("confirm-start", (event, arg) => {
-        console.log(arg);
-        this.$message({
-          type: "success",
-          message: arg
-        });
+      this.$ipcApi.send("statr-server").then((res) => {
+        if (res) {
+          this.$message({
+            type: "success",
+            message: res,
+          });
+        }
       });
     },
     // 获取electron方法
-    open() {
-    },
-    // 设置数据库的数据
-    setdata() {
-      this.$db
-        .adddata(this.newdata)
-        .then(res => this.getdata())
-        .catch(err => console.log(err));
-    },
-    // 获取数据库的数据
-    getdata() {
-      this.$db
-        .finddata()
-        .then(res => {
-          console.log(res);
-          this.textarray = res;
-          console.log(this.textarray);
-        })
-        .catch(err => console.log(err));
-    },
-    // 清空数据库的数据
-    deledata() {
-      // data则是显示需要的参数
-      const data = {
-        title: "清除数据",
-        buttons: ["确定了！", "才不要，我手滑了"],
-        noLink: true,
-        message: "此操作会清空本地数据库中的所有数据，是否继续？"
-      };
-      this.$ipcApi.send("open-messagebox", data);
-    },
+    open() {},
     CheckUpdate(data) {
       switch (data) {
         case "one":
-          const dialog = this.$electron.remote.dialog;
-          this.$ipcApi.send("check-update");
-          console.log("启动检查");
-          this.$ipcApi.on("UpdateMsg", (event, data) => {
-            console.log(data);
-            switch (data.state) {
-              case -1:
-                const msgdata = {
-                  title: data.msg
-                };
-                api.MessageBox(dialog, msgdata);
-                break;
-              case 0:
-                this.$message("正在检查更新");
-                break;
-              case 1:
-                this.$message({
-                  type: "success",
-                  message: "已检查到新版本，开始下载"
-                });
-                this.dialogVisible = true;
-                break;
-              case 2:
-                this.$message({ type: "success", message: "无新版本" });
-                break;
-              case 3:
-                this.percentage = data.msg.percent.toFixed(1);
-                break;
-              case 4:
-                this.progressStaus = "success";
-                this.$alert("更新下载完成！", "提示", {
-                  confirmButtonText: "确定",
-                  callback: action => {
-                    this.$ipcApi.send("confirm-update");
-                  }
-                });
-                break;
-
-              default:
-                break;
-            }
+          this.$ipcApi.send("check-update").then((res) => {
+            console.log("启动检查");
           });
+
           break;
         case "two":
-          console.log(111);
-          this.$ipcApi.send("start-download");
-          this.$ipcApi.on("confirm-download", (event, arg) => {
-            if (arg) {
-              this.dialogVisible = true;
-            }
+          this.$ipcApi.send("start-download").then(() => {
+            this.dialogVisible = true;
           });
-          this.$ipcApi.on("download-progress", (event, arg) => {
-            this.percentage = Number(arg);
-          });
-          this.$ipcApi.on("download-error", (event, arg) => {
-            if (arg) {
-              this.progressStaus = "exception";
-              this.percentage = 40;
-              this.colors = "#d81e06";
-            }
-          });
-          this.$ipcApi.on("download-paused", (event, arg) => {
-            if (arg) {
-              this.progressStaus = "warning";
-              this.$alert("下载由于未知原因被中断！", "提示", {
-                confirmButtonText: "重试",
-                callback: action => {
-                  this.$ipcApi.send("satrt-download");
-                }
-              });
-            }
-          });
-          this.$ipcApi.on("download-done", (event, age) => {
-            this.filePath = age.filePath;
-            this.progressStaus = "success";
-            this.$alert("更新下载完成！", "提示", {
-              confirmButtonText: "确定",
-              callback: action => {
-                this.$electron.shell.openItem(this.filePath);
-              }
-            });
-          });
+
           break;
 
         default:
@@ -245,16 +220,19 @@ export default {
     },
     handleClose() {
       this.dialogVisible = false;
-    }
+    },
   },
   destroyed() {
+    console.log("销毁了哦");
     this.$ipcApi.remove("confirm-message");
     this.$ipcApi.remove("download-done");
     this.$ipcApi.remove("download-paused");
+    this.$ipcApi.remove("confirm-stop");
+    this.$ipcApi.remove("confirm-start");
     this.$ipcApi.remove("confirm-download");
     this.$ipcApi.remove("download-progress");
     this.$ipcApi.remove("download-error");
-  }
+  },
 };
 </script>
 
@@ -311,11 +289,18 @@ main > div {
   margin-bottom: 10px;
 }
 .doc {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 .doc p {
   color: black;
   margin-bottom: 10px;
+}
+.doc .el-button {
+  margin-top: 10px;
+  margin-right: 10px;
+}
+.doc .el-button + .el-button {
+  margin-left: 0;
 }
 .conten {
   text-align: center;

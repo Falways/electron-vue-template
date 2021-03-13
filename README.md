@@ -6,6 +6,16 @@
 [中文在线文档](https://umbrella22.github.io/electron-vue-template-doc/)
 [国内访问地址](https://gitee.com/Zh-Sky/electron-vue-template)
 [国内文档访问地址](https://zh-sky.gitee.io/electron-vue-template-doc/)
+[vite版本](https://github.com/umbrella22/electron-vite-template)
+[vite版本（码云）](https://gitee.com/Zh-Sky/electron-vite-template)
+
+- electron of react [Electron-react-template](https://github.com/umbrella22/electron-react-template)
+
+<p align="center">
+  <a href="https://github.com/umbrella22/electron-vue-template">
+    <img src="https://github.com/umbrella22/electron-vue-template/actions/workflows/build-test.yml/badge.svg">
+  </a>
+</p>
 
 <h3 align="center">Thanks for support.</h3>
 

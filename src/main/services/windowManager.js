@@ -4,19 +4,8 @@ import config from '@config'
 import setIpc from './ipcMain'
 import upload from './checkupdate'
 import DownloadUpdate from './downloadFile'
-import path from 'path'
+import { winURL, loadingURL } from '../config/StaticPath'
 
-/**
- * Set `__static` path to static files in production
- * https://simulatedgreg.gitbooks.io/electron-vue/content/en/using-static-assets.html
- */
-// 这个瓜皮全局变量只能在单个js中生效，而并不是整个主进程中
-if (process.env.NODE_ENV !== 'development') {
-  global.__static = path.join(__dirname, '/static').replace(/\\/g, '\\\\')
-}
-// 将文件地址挪到这里
-const winURL = process.env.NODE_ENV === 'development' ? `http://localhost:${process.env.PORT}` : `file://${__dirname}/index.html`
-const loadingURL = process.env.NODE_ENV === 'development' ? `http://localhost:${process.env.PORT}/static/loader.html` : `file://${__static}/loader.html`
 var loadWindow = null
 var mainWindow = null
 
@@ -37,6 +26,7 @@ function createMainWindow () {
       webSecurity: false,
       // 如果是开发模式可以使用devTools
       devTools: process.env.NODE_ENV === 'development',
+      // devTools: true,
       // 在macos中启用橡皮动画
       scrollBounce: process.platform === 'darwin'
     }
@@ -73,14 +63,14 @@ function createMainWindow () {
   })
 }
 
-function loadindWindow () {
+function loadingWindow () {
   loadWindow = new BrowserWindow({
     width: 400,
     height: 600,
     frame: false,
     backgroundColor: '#222',
-    transparent: true,
     skipTaskbar: true,
+    transparent: true,
     resizable: false,
     webPreferences: { experimentalFeatures: true }
   })
@@ -100,7 +90,7 @@ function loadindWindow () {
 
 function initWindow () {
   if (config.UseStartupChart) {
-    return loadindWindow()
+    return loadingWindow()
   } else {
     return createMainWindow()
   }

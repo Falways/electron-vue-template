@@ -1,6 +1,6 @@
 <!--  -->
 <template>
-  <div class="window-title" v-if="!IsUseSysTitle&&isMac&&!IsWeb">
+  <div class="window-title" v-if="!IsUseSysTitle&&isNotMac&&!IsWeb">
     <!-- 软件logo预留位置 -->
     <div style="-webkit-app-region: drag;" class="logo">
       <svg-icon icon-class="electron-logo"></svg-icon>
@@ -29,17 +29,15 @@ export default {
   data: () => ({
     mix: false,
     IsUseSysTitle: false,
-    isMac: process.platform !== "darwin",
+    isNotMac: process.platform !== "darwin",
     IsWeb: process.env.IS_WEB
   }),
 
   components: {},
   created() {
-    this.$ipcApi.send("IsUseSysTitle");
-    this.$ipcApi.on(
-      "CisUseSysTitle",
-      (event, arg) => (this.IsUseSysTitle = arg)
-    );
+    this.$ipcApi.send("IsUseSysTitle").then(res => {
+      this.IsUseSysTitle = res;
+    });
   },
 
   mounted() {},
@@ -49,8 +47,9 @@ export default {
       this.$ipcApi.send("windows-mini");
     },
     MixOrReduction() {
-      this.$ipcApi.send("window-max");
-      this.$ipcApi.on("window-confirm", (event, arg) => (this.mix = arg));
+      this.$ipcApi.send("window-max").then(res=>{
+        this.mix = res.status
+      })
     },
     Close() {
       this.$ipcApi.send("window-close");

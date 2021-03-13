@@ -1,22 +1,17 @@
 'use strict'
+const IsWeb = process.env.BUILD_TARGET === 'web'
+process.env.BABEL_ENV = IsWeb ? 'web' : 'renderer'
 
-process.env.BABEL_ENV = 'renderer'
-
-const os = require('os')
 const path = require('path')
 const { dependencies } = require('../package.json')
 const webpack = require('webpack')
 const config = require('../config')
 
-const MinifyPlugin = require("babel-minify-webpack-plugin");
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 const TerserPlugin = require('terser-webpack-plugin');
 const { VueLoaderPlugin } = require('vue-loader')
-const HappyPack = require('happypack')
-const HappyThreadPool = HappyPack.ThreadPool({ size: os.cpus().length })
-
 function resolve(dir) {
   return path.join(__dirname, '..', dir)
 }
@@ -27,44 +22,55 @@ function resolve(dir) {
  * that provide pure *.vue files that need compiling
  * https://simulatedgreg.gitbooks.io/electron-vue/content/en/webpack-configurations.html#white-listing-externals
  */
-let whiteListedModules = ['vue', "element-ui"]
+let whiteListedModules = IsWeb ? [] : ['vue', "element-ui"]
+IsWeb ? process.browser = true : process.browser = false
 
 let rendererConfig = {
   devtool: '#cheap-module-eval-source-map',
-  entry: {
-    renderer: resolve('src/renderer/main.js')
-  },
-  externals: [
-    ...Object.keys(dependencies || {}).filter(d => !whiteListedModules.includes(d))
-  ],
+  entry: IsWeb ? { web: path.join(__dirname, '../src/renderer/main.js') } : { renderer: resolve('src/renderer/main.js') },
+  externals: IsWeb ? [] : [...Object.keys(dependencies || {}).filter(d => !whiteListedModules.includes(d))],
   module: {
     rules: [
-      // {
-      //   test: /\.(js|vue)$/,
-      //   enforce: 'pre',
-      //   exclude: /node_modules/,
-      //   use: {
-      //     loader: 'eslint-loader',
-      //     options: {
-      //       formatter: require('eslint-friendly-formatter')
-      //     }
-      //   }
-      // },
       {
         test: /\.scss$/,
-        use: ['vue-style-loader', 'css-loader', 'sass-loader']
+        use: ['vue-style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              esModule: false
+            }
+          },
+          'sass-loader']
       },
       {
         test: /\.sass$/,
-        use: ['vue-style-loader', 'css-loader', 'sass-loader?indentedSyntax']
+        use: ['vue-style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              esModule: false
+            }
+          }, 'sass-loader?indentedSyntax']
       },
       {
         test: /\.less$/,
-        use: ['vue-style-loader', 'css-loader', 'less-loader']
+        use: ['vue-style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              esModule: false
+            }
+          }, 'less-loader']
       },
       {
         test: /\.css$/,
-        use: ['vue-style-loader', 'css-loader']
+        use: ['vue-style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              esModule: false
+            }
+          }]
       },
       {
         test: /\.html$/,
@@ -72,7 +78,12 @@ let rendererConfig = {
       },
       {
         test: /\.js$/,
-        use: 'happypack/loader?id=HappyRendererBabel',
+        use: ['thread-loader', {
+          loader: 'babel-loader',
+          options: {
+            cacheDirectory: true
+          }
+        }],
         exclude: /node_modules/
       },
       {
@@ -81,19 +92,13 @@ let rendererConfig = {
       },
       {
         test: /\.vue$/,
-        use: [{
+        use: {
           loader: 'vue-loader',
           options: {
             cacheDirectory: 'node_modules/.cache/vue-loader',
             cacheIdentifier: '7270960a',
-            extractCSS: process.env.NODE_ENV === 'production',
-            loaders: {
-              sass: 'vue-style-loader!css-loader!sass-loader?indentedSyntax=1',
-              scss: 'vue-style-loader!css-loader!sass-loader',
-              less: 'vue-style-loader!css-loader!less-loader'
-            }
           }
-        }]
+        }
       },
       {
         test: /\.svg$/,
@@ -145,7 +150,8 @@ let rendererConfig = {
     new VueLoaderPlugin(),
     new MiniCssExtractPlugin({ filename: 'styles.css' }),
     new webpack.DefinePlugin({
-      'process.env': process.env.NODE_ENV === 'production' ? config.build.env : config.dev.env
+      'process.env': process.env.NODE_ENV === 'production' ? config.build.env : config.dev.env,
+      'process.env.IS_WEB': IsWeb
     }),
     new HtmlWebpackPlugin({
       filename: 'index.html',
@@ -172,22 +178,11 @@ let rendererConfig = {
       nodeModules: false
     }),
     new webpack.HotModuleReplacementPlugin(),
-    new webpack.NoEmitOnErrorsPlugin(),
-    new HappyPack({
-      id: 'HappyRendererBabel',
-      loaders: [{
-        loader: 'babel-loader',
-        options: {
-          cacheDirectory: true
-        }
-      }],
-      threadPool: HappyThreadPool
-    }),
   ],
   output: {
     filename: '[name].js',
-    libraryTarget: 'commonjs2',
-    path: path.join(__dirname, '../dist/electron')
+    libraryTarget: IsWeb ? 'var' : 'commonjs2',
+    path: IsWeb ? path.join(__dirname, '../dist/web') : path.join(__dirname, '../dist/electron')
   },
   resolve: {
     alias: {
@@ -196,16 +191,17 @@ let rendererConfig = {
     },
     extensions: ['.js', '.vue', '.json', '.css', '.node']
   },
-  target: 'electron-renderer'
+  target: IsWeb ? 'web' : 'electron-renderer'
 }
+// 根据环境调整入口位置
+
 
 /**
  * Adjust rendererConfig for development settings
  */
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' && !IsWeb) {
   rendererConfig.plugins.push(
     new webpack.DefinePlugin({
-      '__static': `"${path.join(__dirname, '../static').replace(/\\/g, '\\\\')}"`,
       '__lib': `"${path.join(__dirname, `../${config.DllFolder}`).replace(/\\/g, '\\\\')}"`
     })
   )
@@ -218,7 +214,6 @@ if (process.env.NODE_ENV === 'production') {
   rendererConfig.devtool = ''
 
   rendererConfig.plugins.push(
-    new MinifyPlugin(),
     new CopyWebpackPlugin({
       patterns: [
         {
@@ -231,7 +226,8 @@ if (process.env.NODE_ENV === 'production') {
       ]
     }),
     new webpack.DefinePlugin({
-      'process.env.NODE_ENV': '"production"'
+      'process.env.NODE_ENV': '"production"',
+      'process.env.libPath': `"${config.DllFolder}"`
     }),
     new webpack.LoaderOptionsPlugin({
       minimize: true
@@ -242,7 +238,7 @@ if (process.env.NODE_ENV === 'production') {
       new TerserPlugin({
         test: /\.js(\?.*)?$/i,
         extractComments: false,
-        cache: false,
+        cache: true,
         sourceMap: false,
         terserOptions: {
           warnings: false,
@@ -262,6 +258,31 @@ if (process.env.NODE_ENV === 'production') {
           },
         }
       })]
+  }
+  if (IsWeb) {
+    rendererConfig.optimization.splitChunks = {
+      chunks: "async",
+      cacheGroups: {
+        vendor: { // 将第三方模块提取出来
+          minSize: 30000,
+          minChunks: 1,
+          test: /node_modules/,
+          chunks: 'initial',
+          name: 'vendor',
+          priority: 1
+        },
+        commons: {
+          test: /[\\/]src[\\/]common[\\/]/,
+          name: 'commons',
+          minSize: 30000,
+          minChunks: 3,
+          chunks: 'initial',
+          priority: -1,
+          reuseExistingChunk: true // 这个配置允许我们使用已经存在的代码块
+        }
+      }
+    }
+    rendererConfig.optimization.runtimeChunk = { name: 'runtime' }
   }
 }
 
